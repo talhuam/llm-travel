@@ -10,22 +10,22 @@ class BuDingConfig(PretrainedConfig):
 
     def __init__(
             self,
-            vocab_size=64797,
-            hidden_size=4096,
-            intermediate_size=11008, # mlp先升维再降维，qwen2该值默认为22016
-            num_hidden_layers=32,
-            num_attention_heads=32,
-            num_key_value_heads=32,
-            hidden_act="silu",
+            vocab_size=64797,               # 词表大小
+            hidden_size=4096,               # 隐藏层大小
+            intermediate_size=11008,        # mlp先升维再降维，qwen2该值默认为22016
+            num_hidden_layers=32,           # decoder layer堆叠层数
+            num_attention_heads=32,         # query注意力头数
+            num_key_value_heads=32,         # key/value头数
+            hidden_act="silu",              # 激活函数
             max_position_embeddings=2048,
-            initializer_range=0.02,
-            rms_norm_eps=1e-6,
+            initializer_range=0.02,         # 用于模型参数初始化，标准差
+            rms_norm_eps=1e-6,              # 用于layer norm
             use_cache=True,
             pad_token_id=None,
             bos_token_id=None,
             eos_token_id=None,
             tie_word_embeddings=False,
-            rope_theta=10000.0,
+            rope_theta=10000.0,             # \theta基数，\theta=10000 ** (-2i/d)
             attention_dropout=0.0,
             **kwargs
     ):
