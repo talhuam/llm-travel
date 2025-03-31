@@ -3,7 +3,7 @@ import argparse
 from huggingface_hub import snapshot_download
 # huggingface国内镜像站
 # autodl需要注释掉该镜像站，并运行：source /etc/network_turbo
-# os.environ["HF_ENDPOINT"]="https://hf-mirror.com"
+os.environ["HF_ENDPOINT"]="https://hf-mirror.com"
 
 def download_model(model_name, local_dir):
     """
