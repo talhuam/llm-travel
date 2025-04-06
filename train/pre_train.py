@@ -3,7 +3,7 @@ import os
 import sys
 from dataclasses import dataclass, field
 from typing import Optional
-
+import argparse
 import datasets
 import torch
 import transformers
@@ -14,9 +14,9 @@ from transformers import (
     set_seed,
 )
 
-from train.buding_dataset import PTDataset
-from train.configuration_buding import BuDingConfig
-from train.modeling_budingllm import BuDingForCausalLLM
+from buding_dataset import PTDataset
+from configuration_buding import BuDingConfig
+from modeling_budingllm import BuDingForCausalLLM
 
 
 @dataclass
@@ -101,9 +101,18 @@ def data_collator_fn(examples):
 
 logger = logging.getLogger(__name__)
 
+
 def main():
+    # 解析命令行参数，在此封装成json的形式，从json配置从解析到dataclass
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--train_args_file", type=str, required=True)
+    args = parser.parse_args()
+    train_args_file = args.train_args_file
+
     parser = HfArgumentParser((ModelArguments, ScriptArguments, TrainingArguments))
-    model_args, script_args, training_args = parser.parse_args_into_dataclasses()
+    # 解析--args的形式的命令行参数
+    # model_args, script_args, training_args = parser.parse_args_into_dataclasses()
+    model_args, script_args, training_args = parser.parse_json_file(json_file=train_args_file)
 
     # logger format
     logging.basicConfig(format="%(asctime)s - %(levelname)s - %(name)s - %(message)s", datefmt="%m/%d/%Y %H:%M:%S",
@@ -130,11 +139,12 @@ def main():
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # init_model
+    # init_model, attention为MHA
     buding_config = BuDingConfig(**dict(
         hidden_size=model_args.hidden_size,
         num_hidden_layers=model_args.num_hidden_layers,
         num_attention_heads=model_args.num_attention_heads,
+        num_key_value_heads=model_args.num_attention_heads,
         intermediate_size=model_args.intermediate_size,
         rope_theta=model_args.rope_theta,
         max_position_embeddings=model_args.max_position_embeddings,
