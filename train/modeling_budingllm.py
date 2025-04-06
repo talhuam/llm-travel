@@ -153,18 +153,33 @@ class BuDingAttention(nn.Module):
         super().__init__()
         self.config = config
         self.layer_idx = layer_idx
-        self.head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
-        self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
+        if layer_idx is None:
+            logger.warning_once(
+                f"Instantiating {self.__class__.__name__} without passing `layer_idx` is not recommended and will "
+                "to errors during the forward call, if caching is used. Please make sure to provide a `layer_idx` "
+                "when creating this class."
+            )
+
+        self.hidden_size = config.hidden_size
+        self.num_heads = config.num_attention_heads
+        self.head_dim = self.hidden_size // self.num_heads
+        self.num_key_value_heads = config.num_key_value_heads
+        self.num_key_value_groups = self.num_heads // self.num_key_value_heads
         self.max_position_embeddings = config.max_position_embeddings
         self.rope_theta = config.rope_theta
-        self.is_causal = True # 因果回归模式
-        self.scaling = self.head_dim ** -0.5
+        # 因果自回归模式
+        self.is_causal = True
         self.attention_dropout = config.attention_dropout
 
-        self.q_proj = nn.Linear(config.hidden_size, config.num_attention_heads * self.head_dim, bias=True)
-        self.k_proj = nn.Linear(config.hidden_size, config.num_key_value_heads * self.head_dim, bias=True)
-        self.v_proj = nn.Linear(config.hidden_size, config.num_key_value_heads * self.head_dim, bias=True)
-        self.o_proj = nn.Linear(config.num_attention_heads * self.head_dim, config.hidden_size, bias=False)
+        if (self.head_dim * self.num_heads) != self.hidden_size:
+            raise ValueError(
+                f"hidden_size must be divisible by num_heads (got `hidden_size`: {self.hidden_size}"
+                f" and `num_heads`: {self.num_heads})."
+            )
+        self.q_proj = nn.Linear(self.hidden_size, self.num_heads * self.head_dim, bias=True)
+        self.k_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=True)
+        self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=True)
+        self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.hidden_size, bias=False)
 
         self.rotary_emb = BuDingRotaryEmbedding(
             self.head_dim,
@@ -719,6 +734,7 @@ class BuDingForCausalLLM(BuDingPreTrainedModel):
             # Enable model parallelism
             # 确保模型并行计算时，labels的数据存储位置与logits一致
             shift_labels = shift_labels.to(shift_logits.device)
+
             loss = loss_fct(shift_logits, shift_labels)
 
         if not return_dict:
@@ -732,3 +748,42 @@ class BuDingForCausalLLM(BuDingPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+
+def print_model_parameters(model):
+    """
+    打印模型各个层参数
+    """
+    param_sum = 0
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            param_sum += param.numel()
+            print(f"Layer: {name}, Parameters: {param.numel()}")
+    print(f"Total of parameters: {param_sum}")
+
+
+if __name__ == '__main__':
+    args_92m = BuDingConfig(
+        hidden_size=512,
+        num_hidden_layers=8,
+        num_attention_heads=8,
+        num_key_value_heads=8,
+        intermediate_size=1408,
+        rope_theta=10000.0,
+        max_position_embeddings=1024,
+        vocab_size=64798,
+    )
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    model = BuDingForCausalLLM(args_92m).to(device)
+
+    print_model_parameters(model)
+
+    input_ids = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=torch.long, device=device)
+    labels = torch.tensor([[1, 4, 3], [2, 3, 1]], device=device)
+
+    print(f"input_ids shape: {input_ids.shape}")
+    outputs = model(input_ids, labels=labels)
+    print(f"logits shape: {outputs.logits.shape}")
+    print(outputs.loss)

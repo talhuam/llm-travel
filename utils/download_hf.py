@@ -3,7 +3,8 @@ import argparse
 from huggingface_hub import snapshot_download
 # huggingface国内镜像站
 # autodl需要注释掉该镜像站，并运行：source /etc/network_turbo
-os.environ["HF_ENDPOINT"]="https://hf-mirror.com"
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
 
 def download_model(model_name, local_dir):
     """
@@ -27,6 +28,7 @@ def download_dataset(dataset_name, local_dir):
     dataset_path = os.path.join(local_dir, dataset_name)
     snapshot_download(repo_id=dataset_name, local_dir=dataset_path, repo_type="dataset")
     print(f"数据集已下载到 {dataset_path}")
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
